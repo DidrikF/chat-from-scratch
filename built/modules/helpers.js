@@ -16,17 +16,25 @@ const path = require("path");
 // const sourceMap = require('source-map');
 const sourceMap = require("source-map");
 const colors = require("colors");
+const config_1 = require("../config");
 /**
  * Recursively get files in the tests-directory matching a regular expression
  * @param directory
  * @returns array of file paths strating from within the tests direcory
  */
-function getTestFileNames(regex) {
-    let baseDir = upDirectory(1); // can this be more dynamic
-    let testDir = path.join(baseDir, 'tests');
+function getTestFileNames(regex = '.*') {
     let results = [];
+    let testDir = path.join(process.cwd(), config_1.default.testDir);
     traverseFileSystem(testDir, regex, results);
-    return results;
+    // filter out .map files
+    const finalResults = [];
+    results.forEach((file) => {
+        if (RegExp(/^.*\.map$/).test(file)) {
+            return;
+        }
+        finalResults.push(file);
+    });
+    return finalResults;
 }
 exports.getTestFileNames = getTestFileNames;
 /**
@@ -42,8 +50,8 @@ function traverseFileSystem(sourceDirectory, regex, results) {
         const match = RegExp(regex).test(currentFile);
         var stats = fs.statSync(currentFile);
         if (stats.isFile() && match) {
-            let tempArr = currentFile.split(/(\\|\/)tests/);
-            currentFile = tempArr[tempArr.length - 1];
+            //let tempArr = currentFile.split(/(\\|\/)tests/);
+            //currentFile = tempArr[tempArr.length-1]
             results.push(currentFile);
         }
         else if (stats.isDirectory()) {
@@ -62,11 +70,14 @@ function upDirectory(amount) {
 exports.upDirectory = upDirectory;
 function getLocationOfLineInTest(stack) {
     return __awaiter(this, void 0, void 0, function* () {
-        for (let i = 0; i < stack.length; i++) {
-            let line = stack[i];
+        if (stack.length === 0)
+            return 'Unable to locate line of fialure in test, because no stack trace was captured.';
+        const stackArr = stack.split('\n');
+        for (let i = 0; i < stackArr.length; i++) {
+            let line = stackArr[i];
             // console.log(line)
             if (/.*\.test\..*/.test(line)) {
-                // console.log("fond test in line")
+                // console.log("found test in line")
                 const originalPosition = yield getPositionInSource(line);
                 return originalPosition.source + colors.red(` at line ${originalPosition.line} `) + `and col ${originalPosition.column}`;
             }
@@ -75,17 +86,47 @@ function getLocationOfLineInTest(stack) {
     });
 }
 exports.getLocationOfLineInTest = getLocationOfLineInTest;
+function captureStack() {
+    let obj = {};
+    Error.captureStackTrace(obj);
+    return obj.stack;
+}
+exports.captureStack = captureStack;
 function getPositionInSource(location) {
     return __awaiter(this, void 0, void 0, function* () {
         let tempArray = location.split(':');
         let columnNr = parseInt(tempArray.pop());
         let lineNr = parseInt(tempArray.pop());
-        // console.log(columnNr, lineNr);
         let tempArr = tempArray.join(':').split(' ');
         let mapFile = tempArr[tempArr.length - 1] + '.map';
-        // console.log(mapFile)
+        mapFile = mapFile.replace(/\(|\)/, '');
         const consumer = yield (new sourceMap.SourceMapConsumer(fs.readFileSync(mapFile, "utf-8")));
         return consumer.originalPositionFor({ line: lineNr, column: columnNr });
     });
 }
+function parseRunOptions() {
+    const arr = process.argv.slice(2, process.argv.length);
+    const valid = ['path', 'group', 'test'];
+    const runOptions = {
+        path: '.*',
+        group: '',
+        test: '.*',
+    };
+    arr.forEach((element) => {
+        if (element.match(/--\w+=.+/)) {
+            let [key, val] = element.split('=');
+            key = key.slice(2);
+            if (valid.indexOf(key) !== -1) {
+                runOptions[key] = val;
+            }
+        }
+    });
+    return runOptions;
+}
+exports.parseRunOptions = parseRunOptions;
+/*
+
+path.resolve(process.cwd(), '.env')
+
+*/ 
 //# sourceMappingURL=helpers.js.map

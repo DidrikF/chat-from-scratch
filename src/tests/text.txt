@@ -1,0 +1,260 @@
+
+for (let i = 0; i < this.testFiles.length; i++) {
+                const testFile = this.testFiles[i];
+                for (let j = 0; j < testFile.describedTests.length; j++) {
+                    const describedTests = testFile.describedTests[j];
+                    for (let k = 0; k < describedTests.tests.length; k++) {
+                        const test = describedTests.tests[k];
+                        if (RegExp(this.runOptions.test).test(test.name)) {
+  
+                            //_________ run the test______________
+                            testFile.ok = true;
+
+                            try {
+                                await testFile.beforeAll();
+                            } catch (err) {
+                                testFile.captureExecError(err, 'Error thrown in beforeAll-hook in file with path: ' + testFile.file);
+                                testFile.ok = false;
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(testFile);
+                                }
+                            }
+
+                            describedTests.ok = true;
+
+                            try {
+                                await describedTests.beforeAll()
+                            } catch (err) {
+                                describedTests.captureExecError(err, 'Error thrown in beforeAll-hook in block with description: ' + describedTests.description);
+                                testFile.ok = false;
+                                describedTests.ok = false;
+
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(describedTests);
+                                }
+                            }
+
+                            try {
+                                await testFile.beforeEach();
+                            } catch (err) { // associated with File
+                                testFile.captureExecError(err, 'Error thrown in beforeAll-hook in file with path: ' + testFile.file);
+                                testFile.ok = false;
+        
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(testFile);
+                                }
+                            }
+                            
+                            try {
+                                await describedTests.beforeEach();
+                            } catch (err) { // associated with describedTests
+                                describedTests.beforeEach(err, 'Error thrown in afterEach-hook in block with description: ' + describedTests.description);
+                                testFile.ok = false;
+                                describedTests.ok = false;
+        
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(describedTests);
+                                }
+                            }
+                            
+                            // run test
+                            try {
+                                this.runningTest = test;
+                                await test.callback();
+        
+                                // a test is successfull if all assertions are successfull and the test did not fail during execution.
+                                const nr_of_assertions_in_last_test = test.assertionNumber
+                                let testOK = true;
+                                for (let i = 0; i < nr_of_assertions_in_last_test; i++) {
+                                    let assertionResult = test.assertionResults[test.assertionResults.length-1 - i]
+                                    if (assertionResult.ok === false) {
+                                        testOK = false
+                                        break;
+                                    }
+                                }
+        
+                                // capture test ok status, and print its result
+                                if (testOK === true) {
+                                    test.ok = true;
+                                    process.stdout.write(colors.green(logSymboles.success)+' '); // needs to be sync
+                                } else {
+                                    test.ok = false;
+                                    describedTests.ok = false;
+                                    testFile.ok = false;
+                                    process.stdout.write(colors.red(logSymboles.error)+' '); // needs to be sync
+        
+                                    if (config.abortTestingOnAssertionFailure) {
+                                        return Promise.reject(test);
+                                    }
+                                }
+        
+                            } catch (err) {
+                                // there was an error running the test, even if all assertion were ok, report the test as an error
+                                test.ok = false;
+                                describedTests.ok = false;
+                                testFile.ok = false;
+                                test.captureExecError(err, 'Error thrown when executing test by name: ' + test.name);
+                                process.stdout.write(colors.red(logSymboles.error)+' '); // needs to be sync
+        
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(test);
+                                }
+                            }
+        
+                            try {
+                                await describedTests.afterEach();
+                            } catch (err) { // associated with describedTests
+                                describedTests.captureExecError(err, 'Error thrown in afterEach-hook in block with description: ' + describedTests.description);
+                                describedTests.ok = false;
+                                testFile.ok = false;
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(describedTests);
+                                }
+                            }
+                            
+                            try {
+                                await testFile.afterEach();
+                            } catch (err) { // associated with File
+                                testFile.captureExecError(err, 'Error thrown in afterEach-hook in file with path: ' + testFile.file);
+                                testFile.ok = false;
+        
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(testFile);
+                                }
+                            }
+                        
+            
+                            try {
+                                await describedTests.afterAll();
+                            } catch (err) { // associated with describedTests
+                                describedTests.captureExecError(err, 'Error thrown in afterAll-hook in block with description: ' + describedTests.description);
+                                describedTests.ok = false;
+                                testFile.ok = false;
+            
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(describedTests);
+                                }
+                            }
+                            
+                            try {
+                                await testFile.afterAll(); // associated with file
+                            } catch (err) {
+                                testFile.captureExecError(err, 'Error thrown in afterAll-hook in file with path: ' + testFile.file);
+                                testFile.ok = false;
+                
+                                if (config.abortTestingOnExecFailure) {
+                                    return Promise.reject(testFile);
+                                }
+                            }
+
+
+
+                            hasExecutedTest = true;
+                            break;
+                        }
+                    }
+                    if (hasExecutedTest === true) break;
+                }
+                if (hasExecutedTest === true) break;
+
+                for (let j = 0; j < testFile.tests.length; j++) {
+                    const test = testFile.tests[j];
+                    if (RegExp(this.runOptions.test).test(test.name)) {
+
+                        //_________ run the test______________
+                        testFile.ok = true;
+                        // run file beforeAll
+                        try {
+                            await testFile.beforeAll();
+                        } catch (err) {
+                            testFile.captureExecError(err, 'Error thrown in beforeAll-hook in file with path: ' + testFile.file);
+                            testFile.ok = false;
+                            if (config.abortTestingOnExecFailure) {
+                                return Promise.reject(testFile);
+                            }
+                        }
+
+                        try {
+                            await testFile.beforeEach();
+                        } catch (err) { // associated with File
+                            testFile.captureExecError(err, 'Error thrown in beforeAll-hook in file with path: ' + testFile.file);
+                            testFile.ok = false;
+    
+                            if (config.abortTestingOnExecFailure) {
+                                return Promise.reject(testFile);
+                            }
+                        }
+
+                        // run test
+                        try {
+                            this.runningTest = test;
+                            await test.callback();
+    
+                            // a test is successfull if all assertions are successfull and the test did not fail during execution.
+                            const nr_of_assertions_in_last_test = test.assertionNumber
+                            let testOK = true;
+                            for (let i = 0; i < nr_of_assertions_in_last_test; i++) {
+                                let assertionResult = test.assertionResults[test.assertionResults.length-1 - i]
+                                if (assertionResult.ok === false) {
+                                    testOK = false
+                                    break;
+                                }
+                            }
+    
+                            // capture test ok status, and print its result
+                            if (testOK === true) {
+                                test.ok = true;
+                                process.stdout.write(colors.green(logSymboles.success)+' '); // needs to be sync
+                            } else {
+                                test.ok = false;
+                                testFile.ok = false;
+                                process.stdout.write(colors.red(logSymboles.error)+' '); // needs to be sync
+    
+                                if (config.abortTestingOnAssertionFailure) {
+                                    return Promise.reject(test);
+                                }
+                            }
+    
+                        } catch (err) {
+                            // there was an error running the test, even if all assertion were ok, report the test as an error
+                            test.ok = false;
+                            testFile.ok = false;
+                            test.captureExecError(err, 'Error thrown when executing test by name: ' + test.name);
+                            process.stdout.write(colors.red(logSymboles.error)+' '); // needs to be sync
+    
+                            if (config.abortTestingOnExecFailure) {
+                                return Promise.reject(test);
+                            }
+                        }
+                        
+                        try {
+                            await testFile.afterEach();
+                        } catch (err) { // associated with File
+                            testFile.captureExecError(err, 'Error thrown in afterEach-hook in file with path: ' + testFile.file);
+                            testFile.ok = false;
+    
+                            if (config.abortTestingOnExecFailure) {
+                                return Promise.reject(testFile);
+                            }
+                        }
+
+                        try {
+                            await testFile.afterAll(); // associated with file
+                        } catch (err) {
+                            testFile.captureExecError(err, 'Error thrown in afterAll-hook in file with path: ' + testFile.file);
+                            testFile.ok = false;
+            
+                            if (config.abortTestingOnExecFailure) {
+                                return Promise.reject(testFile);
+                            }
+                        }
+
+                        hasExecutedTest = true;
+                        break;
+                    }
+                }
+                if (hasExecutedTest === true) break;
+            }
+
+            return Promise.resolve(this);
+        }
